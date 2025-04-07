@@ -5,14 +5,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from fastapi.staticfiles import StaticFiles
 
-from app.api.controller.bookings_router import router as bookings_router
-from app.api.controller.specializations_router import router as specializations_router
-from app.api.controller.users_router import router as users_router
-from app.api.controller.doctors_router import router as doctors_router
+
 from app.async_client import http_client_manager
 from app.core.config import settings, scheduler
+from app.core.logger_config import setup_logger
 from app.tg_bot.router import router as router_tg_bot
 
+
+logger = setup_logger(
+    log_dir="logs",
+    log_file="app_def.log",
+    log_level="DEBUG",  # В разработке
+    rotation="10 MB",  # Ротация каждые 10 МБ
+    retention="30 days",  # Хранить логи 30 дней
+)
 
 async def set_webhook(client):
     """Устанавливает вебхук для Telegram-бота."""

@@ -23,26 +23,48 @@ class Settings(BaseSettings):
     LOG_ROTATION: str = '10 MB'
     DATABASE_URL: str
     STORE_URL: str
-    BASE_SITE: str
-    TG_API_SITE: str
-    FRONT_SITE: str
+
+    BASE_URL: str
+    RABBITMQ_USERNAME: str
+    RABBITMQ_PASSWORD: str
+    RABBITMQ_HOST: str
+    RABBITMQ_PORT: int
+    VHOST: str
 
     model_config = SettingsConfigDict(env_file=env_file_path)
 
+    @property
+    def get_rabbitmq_url(self) -> str:
+        """Возвращаем URL RabbitMQ."""
+        return f'amqp://{quote(self.RABBITMQ_USERNAME)}:{quote(self.RABBITMQ_PASSWORD)}@' + \
+               f'{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/{quote(self.VHOST)}'
+
+    @property
     def get_database_url(self) -> str:
         """Возвращает путь к базе данных"""
         return self.DATABASE_URL
 
+    @property
     def get_webhook_url(self) -> str:
         """Возвращаем URL вебхука."""
-        return f'{self.BASE_SITE}/webhook'
-
-    def get_tg_api_url(self) -> str:
-        """Возвращает URL Telegram API."""
-        return f'{self.TG_API_SITE}/bot{self.BOT_TOKEN}'
+        return f'{self.BASE_URL}/webhook'
 
 
+# Инициализация конфигурации
 settings = Settings()
+
+# Настройка логирования
+log_file_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'log.txt'
+    )
+logger.add(
+    log_file_path, format=settings.FORMAT_LOG, level="INFO", rotation=settings.LOG_ROTATION
+    )
+
+# Создание брокера сообщений RabbitMQ
+broker = RabbitBroker(url=settings.get_rabbitmq_url)
+
+# Создание планировщика задач
 scheduler = AsyncIOScheduler(
-    jobstores={'default': SQLAlchemyJobStore(url=settings.STORE_URL)}
-        )
+    jobstores={'default': SQLAlchemyJobStore(url=settings.STORE_URL)
+               })
