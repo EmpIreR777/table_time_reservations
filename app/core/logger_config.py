@@ -92,5 +92,15 @@ def setup_logger(
     # 4. Отключаем ненужные логи
     logging.getLogger("uvicorn.access").disabled = True  # Доступы Uvicorn
     logging.getLogger("uvicorn.error").setLevel(log_level)  # Ошибки Uvicorn
+    logging.getLogger("fastapi").setLevel(log_level)  # Логи самого FastAPI (роутеры, middleware и т.д.)
+    logging.getLogger("aiocache").setLevel(log_level)  # Кеширование (redis/memory)
+    logging.getLogger("aio_pika").setLevel(log_level)  # RabbitMQ клиент
+    logging.getLogger("aiosqlite").setLevel(log_level)  # Асинхронный драйвер SQLite
+    logging.getLogger("sqlalchemy.engine").setLevel(
+        logging.WARNING if log_level == "INFO" else log_level  # SQL-запросы только для DEBUG
+    )
+    logging.getLogger("alembic").setLevel(log_level)  # Логи миграций базы данных
+    logging.getLogger("asyncio").setLevel(log_level)  # События цикла событий asyncio
+    logging.getLogger("apscheduler").setLevel(log_level)  # Планировщик задач
 
     return logger

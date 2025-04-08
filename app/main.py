@@ -78,8 +78,5 @@ app.add_middleware(
 )
 
 # Подключаем роутеры
-app.include_router(bookings_router)
-app.include_router(specializations_router)
-app.include_router(users_router)
-app.include_router(doctors_router)
+
 app.include_router(router_tg_bot)
