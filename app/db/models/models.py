@@ -1,7 +1,7 @@
 from datetime import datetime, time
 # from enum import Enum
 from typing import Optional, List
-from sqlalchemy import BigInteger, Date, Integer, String, Text, ForeignKey, Time, Enum as SQLEnum
+from sqlalchemy import BigInteger, Date, Integer, String, Text, ForeignKey, Time #, Enum as SQLEnum
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
