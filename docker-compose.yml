@@ -1,41 +1,59 @@
 services:
-  db:
-    image: postgres:13.10
-    env_file: .env
-    ports:
-      - "5433:5432"
+
+  rabbitmq:
+      image: rabbitmq:3-management
+      container_name: rabbitmq
+      hostname: rabbitmq
+      restart: unless-stopped
+      ports:
+        - "5672:5672"  # AMQP порт
+        - "15672:15672"  # Web UI порт
+      environment:
+        RABBITMQ_DEFAULT_USER: admin
+        RABBITMQ_DEFAULT_PASS: password
+        RABBITMQ_DEFAULT_VHOST: myapp_vhost
+      # volumes:
+      #   - rabbitmq_data:/var/lib/rabbitmq
+      #   - rabbitmq_logs:/var/log/rabbitmq
+  # db:
+  #   image: postgres:13.10
+  #   env_file: .env
+  #   ports:
+  #     - "5433:5432"
     # volumes:
     #   - pg_data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    command: >
-      postgres -c max_connections=1000
-               -c shared_buffers=256MB
-               -c effective_cache_size=768MB
-               -c maintenance_work_mem=64MB
-               -c checkpoint_completion_target=0.7
-               -c wal_buffers=16MB
-               -c default_statistics_target=100
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_antennas -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: unless-stopped
-  web:
-    build: .
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-    ports:
-      - "5000:5000"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '0.50'
+  #         memory: 512M
+  #       reservations:
+  #         cpus: '0.25'
+  #         memory: 256M
+  #   command: >
+  #     postgres -c max_connections=1000
+  #              -c shared_buffers=256MB
+  #              -c effective_cache_size=768MB
+  #              -c maintenance_work_mem=64MB
+  #              -c checkpoint_completion_target=0.7
+  #              -c wal_buffers=16MB
+  #              -c default_statistics_target=100
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "pg_antennas -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #   restart: unless-stopped
+  # web:
+  #   build: .
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+  #   ports:
+  #     - "5000:5000"
 # volumes:
 #   pg_data:
+#   rabbitmq_data:
+#   rabbitmq_logs:
