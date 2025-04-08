@@ -4,7 +4,7 @@ from app.dao.users_dao import UserDAO
 from app.dao.bookings_dao import BookingDAO
 from app.schemas.users_schemas import UserModel
 from app.schemas.specializations_schemas import TelegramIDModel
-from app.tg_bot.kbs import back_kb, main_kb, generate_kb_profile
+from app.tg_bot.user.kbs import back_kb, main_kb, generate_kb_profile
 from app.tg_bot.methods import call_answer, bot_send_message, \
     get_about_text, get_booking_text, get_greeting_text
 from app.tg_bot.utils import format_appointment
