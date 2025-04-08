@@ -2,13 +2,13 @@ from datetime import datetime
 from decimal import Decimal
 import uuid
 from sqlalchemy import Integer, func, inspect
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import \
     AsyncAttrs, async_sessionmaker, create_async_engine, AsyncSession
 from app.core.config import settings
 
 
-engine = create_async_engine(url=settings.get_database_url())
+engine = create_async_engine(url=settings.get_database_url)
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession)
 
 
@@ -23,10 +23,6 @@ class Base(AsyncAttrs, DeclarativeBase):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now())
-
-    @declared_attr.directive
-    def __tablename__(cls) -> str:
-        return f'{cls.__name__.lower()}s'
 
     def to_dict(self, exclude_none: bool = False):
         """

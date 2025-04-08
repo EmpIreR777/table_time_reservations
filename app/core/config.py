@@ -10,7 +10,7 @@ from loguru import logger
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-env_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
+env_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '.env')
 
 load_dotenv(env_file_path, override=True)
 

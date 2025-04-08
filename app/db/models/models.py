@@ -1,81 +1,77 @@
-from datetime import datetime, time, date, timezone
+from datetime import datetime, time
+# from enum import Enum
 from typing import Optional, List
-from sqlalchemy import Integer, Text, ForeignKey, DateTime, text
+from sqlalchemy import BigInteger, Date, Integer, String, Text, ForeignKey, Time, Enum as SQLEnum
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 
 
-class User(Base):
+# class BookingStatus(str, Enum):
+#     CONFIRMED = 'ПОДТВЕРЖДЕНО'
+#     CANCELLED = 'ОТМЕНЕНО'
+#     PENDING = 'ОЖИДАНИЕ'
 
-    telegram_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+
+class User(Base):
+    __tablename__ = 'users'
+
+    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     username: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     first_name: Mapped[str] = mapped_column(Text, nullable=False)
     last_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    bookings: Mapped[List['Booking']] = relationship(
-        back_populates='user', cascade='all, delete-orphan')
+    bookings: Mapped[List['Booking']] = relationship(back_populates='user', cascade='all, delete-orphan')
 
     @hybrid_property
     def full_name(self) -> str:
-        return f'{self.first_name} {self.last_name}'
+        return f'{self.first_name} {self.last_name or ""}'.strip()
 
     def __repr__(self) -> str:
-        return f'User(id={self.id}, username={self.username}, first_name={self.first_name}, last_name={self.last_name})'
+        return f'User(id={self.id}, username={self.username}, full_name={self.full_name})'
 
 
-class Doctor(Base):
+class Table(Base):
+    __tablename__ = 'tables'
 
-    first_name: Mapped[str] = mapped_column(Text, nullable=False)
-    last_name: Mapped[str] = mapped_column(Text, nullable=False)
-    patronymic: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    special: Mapped[str] = mapped_column(Text, nullable=False)
-    specialization_id: Mapped[int] = mapped_column(
-        ForeignKey('specializations.id'), server_default=text('1'), nullable=False
-    )
-    work_experience: Mapped[int] = mapped_column(Integer, nullable=False)
-    experience: Mapped[str] = mapped_column(Text, nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    photo: Mapped[str] = mapped_column(Text, nullable=False)
+    capacity: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
-    bookings: Mapped[List['Booking']] = relationship(
-        back_populates='doctor', cascade='all, delete-orphan')
-    specialization: Mapped['Specialization'] = relationship(
-        'Specialization', back_populates='doctors', lazy='joined')
+    bookings: Mapped[List['Booking']] = relationship(back_populates='table', cascade='all, delete-orphan')
 
     def __repr__(self) -> str:
-        return f'Doctor(id={self.id}, first_name={self.first_name}, special={self.special})'
+        return f'Table(id={self.id}, capacity={self.capacity}, description={self.description})'
 
 
-class Specialization(Base):
-    __tablename__ = 'specializations'
+class TimeSlot(Base):
+    __tablename__ = 'time_slots'
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    icon: Mapped[str] = mapped_column(Text, nullable=False)
-    label: Mapped[str] = mapped_column(Text, nullable=False)
-    specialization: Mapped[str] = mapped_column(Text, nullable=False)
+    start_time: Mapped[time] = mapped_column(Time, nullable=False)
+    end_time: Mapped[time] = mapped_column(Time, nullable=False)
 
-    doctors: Mapped[List['Doctor']] = relationship(
-        back_populates='specialization', cascade='all, delete-orphan')
+    bookings: Mapped[List['Booking']] = relationship(back_populates='time_slot', cascade='all, delete-orphan')
 
     def __repr__(self) -> str:
-        return f'Specialization(id={self.id}, label={self.label}, specialization={self.specialization})'
+        return f'TimeSlot(id={self.id}, {self.start_time.strftime("%H:%M")}-{self.end_time.strftime("%H:%M")})'
 
 
 class Booking(Base):
+    __tablename__ = 'bookings'
 
-    doctor_id: Mapped[int] = mapped_column(ForeignKey('doctors.id'), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
-    day_booking: Mapped[date] = mapped_column(nullable=False)
-    time_booking: Mapped[time] = mapped_column(nullable=False)
-    booking_status: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('users.id'), nullable=False)
+    table_id: Mapped[int] = mapped_column(Integer, ForeignKey('tables.id'), nullable=False)
+    time_slot_id: Mapped[int] = mapped_column(Integer, ForeignKey('time_slots.id'), nullable=False)
+    date: Mapped[datetime] = mapped_column(Date, nullable=False)
+    # status: Mapped[BookingStatus] = mapped_column(SQLEnum(BookingStatus), nullable=False)
+    status: Mapped[str]
 
-    doctor: Mapped['Doctor'] = relationship(back_populates='bookings')
-    user: Mapped['User'] = relationship(back_populates='bookings')
+    user: Mapped['User'] = relationship('User', back_populates='bookings')
+    table: Mapped['Table'] = relationship('Table', back_populates='bookings')
+    time_slot: Mapped['TimeSlot'] = relationship('TimeSlot', back_populates='bookings')
 
     def __repr__(self) -> str:
-        return f'Booking(id={self.id}, doctor_id={self.doctor_id}, user_id={self.user_id}, booking_status={self.booking_status})'
+        return (
+            f'Booking(id={self.id}, user_id={self.user_id}, table_id={self.table_id}, '
+            f'time_slot_id={self.time_slot_id}, date={self.date}, status={self.status})'
+        )
