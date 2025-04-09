@@ -26,7 +26,7 @@ async def cmd_start(message: Message, session_with_commit: AsyncSession, state: 
     user_info = await UserDAO(session_with_commit).find_one_or_none_by_id(user_id)
     if user_info is None:
         user_schema = SUser(
-            id=user_id, first_name=user_data.first_name, last_name=user_data.last_name, username=user_data.username
+            telegram_id=user_id, first_name=user_data.first_name, last_name=user_data.last_name, username=user_data.username
         )
         await UserDAO(session_with_commit).add(user_schema)
     text = (
