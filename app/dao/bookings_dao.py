@@ -11,228 +11,156 @@ from app.db.models.models import Booking, TimeSlot
 
 
 class BookingDAO(BaseDAO[Booking]):
-    """DAO для работы с бронированиями."""
-
     model = Booking
 
-    @classmethod
-    async def check_available_bookings(
-        cls, session: AsyncSession, table_id: int, booking_date: date, time_slot_id: int
-    ) -> bool:
-        """
-        Проверяет наличие существующих броней для стола на указанную дату и временной слот.
-
-        :param session: Асинхронная сессия SQLAlchemy
-        :param table_id: ID стола
-        :param booking_date: Дата бронирования
-        :param time_slot_id: ID временного слота
-        :return: True если стол свободен, False если занят
-        """
-        logger.info(f'Проверка доступности стола {table_id} на {booking_date} в слот {time_slot_id}')
+    async def check_available_bookings(self, table_id: int, booking_date: date, time_slot_id: int):
+        """Проверяет наличие существующих броней для стола на указанную дату и временной слот."""
         try:
-            query = select(cls.model).filter_by(table_id=table_id, date=booking_date, time_slot_id=time_slot_id)
-            result = await session.execute(query)
-            bookings = result.scalars().all()
+            query = select(self.model).filter_by(table_id=table_id, date=booking_date, time_slot_id=time_slot_id)
+            result = await self._session.execute(query)
 
-            if not bookings:
-                logger.info('Стол свободен - броней не найдено')
+            # Если результатов нет, стол свободен
+            if not result.scalars().all():
                 return True
 
-            for booking in bookings:
+            # Проверяем статус существующих бронирований
+            for booking in result.scalars().all():
                 if booking.status == "booked":
-                    logger.info(f'Стол занят - найдена активная бронь ID {booking.id}')
-                    return False
+                    return False  # Стол занят
 
-            logger.info('Стол свободен - все брони неактивны')
+                # Для других статусов считаем стол свободным
+                continue
+            # Если все брони имеют неактивные статусы
             return True
 
         except SQLAlchemyError as e:
             logger.error(f"Ошибка при проверке доступности брони: {e}")
-            raise
 
-    @classmethod
-    async def get_available_time_slots(cls, session: AsyncSession, table_id: int, booking_date: date) -> list[TimeSlot]:
-        """
-        Получает список доступных временных слотов для стола на указанную дату.
-
-        :param session: Асинхронная сессия SQLAlchemy
-        :param table_id: ID стола
-        :param booking_date: Дата бронирования
-        :return: Список доступных временных слотов
-        """
-        logger.info(f'Получение доступных слотов для стола {table_id} на {booking_date}')
+    async def get_available_time_slots(self, table_id: int, booking_date: date):
+        """Получает список доступных временных слотов для стола на указанную дату."""
         try:
             # Получаем все брони для данного стола и даты
-            bookings_query = select(cls.model).filter_by(table_id=table_id, date=booking_date)
-            bookings_result = await session.execute(bookings_query)
+            bookings_query = select(self.model).filter_by(table_id=table_id, date=booking_date)
+            bookings_result = await self._session.execute(bookings_query)
             # Составляем набор занятых слотов (только с активными бронями)
             booked_slots = {
                 booking.time_slot_id for booking in bookings_result.scalars().all() if booking.status == "booked"
             }
-            # Получаем все доступные слоты
-            available_slots_query = select(TimeSlot).where(~TimeSlot.id.in_(booked_slots))
-            available_slots_result = await session.execute(available_slots_query)
-
-            slots = available_slots_result.scalars().all()
-            logger.info(f'Найдено {len(slots)} доступных слотов')
-            return slots
+            # Получаем все доступные слоты, исключая занятые
+            available_slots_query = select(TimeSlot).filter(~TimeSlot.id.in_(booked_slots))
+            available_slots_result = await self._session.execute(available_slots_query)
+            return available_slots_result.scalars().all()
         except SQLAlchemyError as e:
-            logger.error(f"Ошибка при получении слотов: {e}")
-            raise
+            logger.error(f"Ошибка при получении доступных временных слотов: {e}")
 
-    @classmethod
-    async def get_bookings_with_details(cls, session: AsyncSession, user_id: int) -> list[Booking]:
+    async def get_bookings_with_details(self, user_id: int):
         """
-        Получает список бронирований пользователя с деталями о столе и времени.
+        Получает список всех бронирований пользователя с полной информацией о столике и временном слоте.
 
-        :param session: Асинхронная сессия SQLAlchemy
-        :param user_id: ID пользователя
-        :return: Список бронирований с деталями
+        :param user_id: ID пользователя, брони которого нужно получить.
+        :return: Список объектов Booking с загруженными данными о столе и времени.
         """
-        logger.info(f'Получение бронирований с деталями для пользователя {user_id}')
         try:
             query = (
-                select(cls.model)
-                .options(joinedload(cls.model.table), joinedload(cls.model.time_slot))
+                select(self.model)
+                .options(joinedload(self.model.table), joinedload(self.model.time_slot))
                 .filter_by(user_id=user_id)
             )
-
-            result = await session.execute(query)
-            bookings = result.scalars().all()
-            logger.info(f'Найдено {len(bookings)} бронирований')
-            return bookings
-
+            result = await self._session.execute(query)
+            return result.scalars().all()
         except SQLAlchemyError as e:
-            logger.error(f"Ошибка при получении бронирований: {e}")
-            raise
+            logger.error(f"Ошибка при получении бронирований с деталями: {e}")
+            return []
 
-    @classmethod
-    async def complete_past_bookings(cls, session: AsyncSession) -> None:
+    async def complete_past_bookings(self):
         """
-        Обновляет статус прошедших бронирований на 'completed'.
-
-        :param session: Асинхронная сессия SQLAlchemy
+        Обновляет статус бронирований на 'completed', если дата и время бронирования уже прошли.
         """
-        logger.info('Обновление статусов прошедших бронирований')
         try:
+            # Получаем текущее время
             now = datetime.now()
-
-            # Подзапрос для времени начала слота
-            slot_time_subq = select(TimeSlot.start_time).where(TimeSlot.id == cls.model.time_slot_id).scalar_subquery()
-
-            # Запрос для получения ID бронирований для обновления
-            query = select(cls.model.id).where(
-                and_(
-                    cls.model.status == "booked",
-                    or_(cls.model.date < now.date(), and_(cls.model.date == now.date(), slot_time_subq < now.time())),
+            subquery = select(TimeSlot.start_time).where(TimeSlot.id == self.model.time_slot_id).scalar_subquery()
+            query = (
+                select(Booking.id)
+                .where(Booking.date < now.date(), self.model.status == "booked")
+                .union_all(
+                    select(Booking.id).where(
+                        self.model.date == now.date(), subquery < now.time(), self.model.status == "booked"
+                    )
                 )
             )
 
-            result = await session.execute(query)
-            booking_ids = result.scalars().all()
+            # Выполняем запрос и получаем id бронирований, которые нужно обновить
+            result = await self._session.execute(query)
+            booking_ids_to_update = result.scalars().all()
 
-            if not booking_ids:
-                logger.info('Нет бронирований для обновления')
-                return
+            if booking_ids_to_update:
+                # Формируем запрос на обновление статуса бронирований
+                update_query = update(Booking).where(Booking.id.in_(booking_ids_to_update)).values(status="completed")
 
-            # Обновление статуса
-            update_query = update(cls.model).where(cls.model.id.in_(booking_ids)).values(status="completed")
+                # Выполняем запрос на обновление
+                await self._session.execute(update_query)
 
-            await session.execute(update_query)
-            await session.commit()
-            logger.info(f'Обновлено {len(booking_ids)} бронирований')
+                # Подтверждаем изменения
+                await self._session.commit()
+
+                logger.info(f"Обновлен статус для {len(booking_ids_to_update)} бронирований на 'completed'")
+            else:
+                logger.info("Нет бронирований для обновления статуса.")
 
         except SQLAlchemyError as e:
-            logger.error(f"Ошибка при обновлении статусов: {e}")
-            await session.rollback()
-            raise
+            logger.error(f"Ошибка при обновлении статуса бронирований: {e}")
+            await self._session.rollback()
 
-    @classmethod
-    async def cancel_booking(cls, session: AsyncSession, booking_id: int) -> int:
-        """
-        Отменяет бронирование по ID.
-
-        :param session: Асинхронная сессия SQLAlchemy
-        :param booking_id: ID бронирования
-        :return: Количество изменённых записей
-        """
-        logger.info(f'Отмена бронирования {booking_id}')
+    async def cancel_book(self, book_id: int):
         try:
             query = (
-                update(cls.model)
-                .where(cls.model.id == booking_id)
+                update(self.model)
+                .filter_by(id=book_id)
                 .values(status="canceled")
                 .execution_options(synchronize_session="fetch")
             )
-            result = await session.execute(query)
-            await session.flush()
-
-            count = result.rowcount
-            if count:
-                logger.info(f'Бронирование {booking_id} отменено')
-            else:
-                logger.warning(f'Бронирование {booking_id} не найдено')
-
-            return count
-
+            result = await self._session.execute(query)
+            await self._session.flush()
+            return result.rowcount
         except SQLAlchemyError as e:
-            logger.error(f"Ошибка при отмене бронирования: {e}")
-            await session.rollback()
+            logger.error(f"Ошибка при отмене книги с ID {book_id}: {e}")
+            await self._session.rollback()
             raise
 
-    @classmethod
-    async def delete_booking(cls, session: AsyncSession, booking_id: int) -> int:
-        """
-        Удаляет бронирование по ID.
-
-        :param session: Асинхронная сессия SQLAlchemy
-        :param booking_id: ID бронирования
-        :return: Количество удалённых записей
-        """
-        logger.info(f'Удаление бронирования {booking_id}')
+    async def delete_book(self, book_id: int):
         try:
-            query = delete(cls.model).where(cls.model.id == booking_id)
-            result = await session.execute(query)
-
-            count = result.rowcount
-            logger.info(f'Удалено {count} бронирований')
-            await session.flush()
-            return count
-
+            query = delete(self.model).filter_by(id=book_id)
+            result = await self._session.execute(query)
+            logger.info(f"Удалено {result.rowcount} записей.")
+            await self._session.flush()
+            return result.rowcount
         except SQLAlchemyError as e:
-            logger.error(f"Ошибка при удалении бронирования: {e}")
-            await session.rollback()
+            logger.error(f"Ошибка при удалении записей: {e}")
             raise
 
-    @classmethod
-    async def book_count(cls, session: AsyncSession) -> dict[str, int]:
+    async def book_count(self) -> Dict[str, int]:
         """
-        Подсчитывает количество бронирований по каждому статусу и общее количество.
-        
-        :param session: Асинхронная сессия SQLAlchemy
-        :return: Словарь с количеством бронирований по статусам и общим количеством
+        Подсчитывает количество заявок по каждому статусу (booked, completed, canceled).
         """
-        logger.info('Подсчет статистики бронирований по статусам')
         try:
+            status_counts = {}
             statuses = ["booked", "completed", "canceled"]
-            stats = {}
 
-            # Получаем количество по каждому статусу
             for status in statuses:
-                query = select(func.count(cls.model.id)).where(cls.model.status == status)
-                result = await session.execute(query)
-                stats[status] = result.scalar_one()
-                logger.debug(f'Статус {status}: {stats[status]} бронирований')
+                query = select(func.count(self.model.id)).where(self.model.status == status)
+                result = await self._session.execute(query)
+                count = result.scalar()
+                status_counts[status] = count
+                logger.info(f"Найдено {count} заявок со статусом '{status}'.")
 
-            # Получаем общее количество бронирований
-            total_query = select(func.count(cls.model.id))
-            stats['total'] = (await session.execute(total_query)).scalar_one()
+            total_query = select(func.count(self.model.id))
+            total_result = await self._session.execute(total_query)
+            total_count = total_result.scalar()
+            status_counts['total'] = total_count
+            logger.info(f"Всего найдено {total_count} заявок.")
 
-            logger.info(f'Итого бронирований: {stats["total"]} (booked: {stats["booked"]}, '
-                    f'completed: {stats["completed"]}, canceled: {stats["canceled"]})')
-
-            return stats
-
+            return status_counts
         except SQLAlchemyError as e:
-            logger.error(f'Ошибка при подсчете статистики бронирований: {e}')
+            logger.error(f"Ошибка при подсчете заявок по статусам: {e}")
             raise

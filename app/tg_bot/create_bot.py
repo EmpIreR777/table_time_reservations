@@ -52,3 +52,13 @@ async def start_bot():
         except:
             pass
     logger.info("Бот успешно запущен.")
+
+
+# Функция, которая выполнится когда бот завершит свою работу
+async def stop_bot():
+    try:
+        for admin_id in settings.ADMIN_IDS:
+            await bot.send_message(admin_id, 'Бот остановлен. За что?😔')
+    except:
+        pass
+    logger.error("Бот остановлен!")

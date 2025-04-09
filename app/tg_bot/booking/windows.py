@@ -52,7 +52,7 @@ def get_table_window() -> Window:
             Cancel(Const('Отмена'), on_click=cancel_logic),
             width=2
         ),
-        getter=get_all_tables
+        getter=get_all_tables,
         state=BookingState.table,
     )
 

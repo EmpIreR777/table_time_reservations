@@ -1,14 +1,11 @@
-import json
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-
-
-from app.async_client import http_client_manager
-from app.core.config import settings, scheduler
 from app.core.logger_config import setup_logger
-from app.tg_bot.router import router as router_tg_bot
+from app.tg_bot.create_bot import dp, start_bot, bot, stop_bot
+from app.core.config import settings, broker, scheduler
+from aiogram.types import Update
+from fastapi import FastAPI, Request
+
+from app.api.router import disable_booking
 
 
 logger = setup_logger(
@@ -19,63 +16,34 @@ logger = setup_logger(
     retention="30 days",  # Хранить логи 30 дней
 )
 
-async def set_webhook(client):
-    """Устанавливает вебхук для Telegram-бота."""
-    try:
-        response = await client.post(
-            f'{settings.get_tg_api_url()}/setWebhook', json={'url': settings.get_webhook_url()}
-        )
-        logger.info(f'Webhook: {settings.get_webhook_url()}')
-        response_data = response.json()
-        if response.status_code == status.HTTP_200_OK and response_data.get('ok'):
-            logger.info(f'Webhook установлен: {response_data}')
-        else:
-            logger.error(f'Ошибка при установке вебхука: {response_data}')
-    except Exception as e:
-        logger.exception(f'Не удалось установить вебхук: {e}')
-
-
-async def send_admin_msg(client, text):
-    """Отправляет сообщение администраторам."""
-    for admin in settings.ADMIN_IDS:
-        try:
-            await client.post(
-                f'{settings.get_tg_api_url()}/sendMessage', json={'chat_id': admin, 'text': text, 'parse_mode': 'HTML'}
-            )
-        except Exception as e:
-            logger.exception(f'Ошибка при отправке сообщения админу: {e}')
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Контекстный менеджер для настройки и завершения работы бота."""
-    async with http_client_manager.client() as client:  # Используем контекстный менеджер
-        logger.info('Настройка бота...')
-        scheduler.start()
-        await set_webhook(client)
-        await client.post(
-            f'{settings.get_tg_api_url()}/setMyCommands',
-            data={'commands': json.dumps([{'command': 'start', 'description': 'Главное меню'}])},
-        )
-        await send_admin_msg(client, 'Бот запущен!')
-        yield
-        logger.info('Завершение работы бота...')
-        await send_admin_msg(client, 'Бот остановлен!')
-        scheduler.shutdown()
+    logger.info("Бот запущен...")
+    await start_bot()
+    await broker.start()
+    scheduler.start()
+    scheduler.add_job(disable_booking, trigger='interval', minutes=30, id='disable_booking_task', replace_existing=True)
+    webhook_url = settings.get_webhook_url
+    await bot.set_webhook(
+        url=webhook_url, allowed_updates=dp.resolve_used_update_types(), drop_pending_updates=True)
+    logger.success(f"Вебхук установлен: {settings.get_webhook_url}")
+    yield
+    logger.info("Бот остановлен...")
+    await stop_bot()
+    await broker.close()
+    scheduler.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)
-app.mount('/static', StaticFiles(directory='app/static'), name='static')
 
-# Добавляем middleware для CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=['*'],  # Разрешаем все источники
-    allow_credentials=True,
-    allow_methods=['*'],  # Разрешаем все методы
-    allow_headers=['*'],  # Разрешаем все заголовки
-)
-
-# Подключаем роутеры
-
-app.include_router(router_tg_bot)
+@app.post("/webhook")
+async def webhook(request: Request) -> None:
+    logger.info("Получен запрос с вебхука.")
+    try:
+        update_data = await request.json()
+        update = Update.model_validate(update_data, context={"bot": bot})
+        await dp.feed_update(bot, update)
+        logger.info("Обновление успешно обработано.")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке обновления с вебхука: {e}")

@@ -11,7 +11,7 @@ import sys
 import logging
 import os
 from pathlib import Path
-from loguru import logger, Logger
+from loguru import logger
 
 
 class InterceptHandler(logging.Handler):
@@ -44,7 +44,7 @@ def setup_logger(
     log_level: str = "INFO",
     rotation: str = "100 MB",
     retention: str = "7 days",
-    ) -> Logger:
+    ):
     """
     Настройка логгера для приложения.
 
