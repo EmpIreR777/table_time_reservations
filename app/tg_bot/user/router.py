@@ -1,4 +1,3 @@
-import logging
 from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart
