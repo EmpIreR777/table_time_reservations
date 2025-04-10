@@ -1,7 +1,7 @@
 services:
 
   rabbitmq:
-      image: rabbitmq:3-management
+      image: rabbitmq:3.12-management-alpine
       container_name: rabbitmq
       hostname: rabbitmq
       restart: unless-stopped

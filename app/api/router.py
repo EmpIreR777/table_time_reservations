@@ -1,19 +1,23 @@
+import asyncio
 from datetime import datetime, timedelta
-from faststream.rabbit.fastapi import RabbitBroker
+import time
+from loguru import logger
 
-from app.core.logger_config import logger
 from app.tg_bot.create_bot import bot
-from app.core.config import settings, scheduler
+from app.core.config import settings, scheduler, broker
 from app.dao.bookings_dao import BookingDAO
-from app.db.session_maker_fast_api import db_session
+from app.db.database import async_session_maker
 
 
-router = RabbitBroker(url=settings.get_rabbitmq_url)
+async def disable_booking():
+    async with async_session_maker() as session:
+        await BookingDAO(session).complete_past_bookings()
 
 
-@router.subscriber('admin_msg')
+@broker.subscriber("admin_msg")
 async def send_booking_msg(msg: str):
     for admin in settings.ADMIN_IDS:
+        time.sleep(12)
         await bot.send_message(admin, text=msg)
 
 
@@ -21,7 +25,7 @@ async def send_user_msg(user_id: int, text: str):
     await bot.send_message(user_id, text=text)
 
 
-@router.subscriber('noti_user')
+@broker.subscriber("noti_user")
 async def schedule_user_notifications(user_id: int):
     """Планирует отправку серии сообщений пользователю с разными интервалами."""
     now = datetime.now()
@@ -42,7 +46,7 @@ async def schedule_user_notifications(user_id: int):
         },
         {
             "time": now + timedelta(hours=24),
-            "text": "Мы ценим ваше мнение! Расскажите о своем опыте и получите приятный бонус! 🎁",
+            "text": "Мы ценим ваше мнение! Расскажите о своем опыте, и получите приятный бонус! 🎁",
         },
     ]
 
@@ -57,7 +61,3 @@ async def schedule_user_notifications(user_id: int):
             replace_existing=True,
         )
         logger.info(f"Запланировано уведомление для пользователя {user_id} на {notification['time']}")
-
-
-async def disable_booking():
-    await BookingDAO.complete_past_bookings(session=db_session.get_session(True))

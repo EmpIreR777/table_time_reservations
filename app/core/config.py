@@ -34,8 +34,10 @@ class Settings(BaseSettings):
     @property
     def get_rabbitmq_url(self) -> str:
         """Возвращаем URL RabbitMQ."""
-        return f'amqp://{quote(self.RABBITMQ_USERNAME)}:{quote(self.RABBITMQ_PASSWORD)}@' + \
-               f'{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/{quote(self.VHOST)}'
+        return (
+            f"amqp://{self.RABBITMQ_USERNAME}:{quote(self.RABBITMQ_PASSWORD)}@"
+            f"{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/{self.VHOST}"
+        )
 
     @property
     def get_database_url(self) -> str:
@@ -51,8 +53,9 @@ class Settings(BaseSettings):
 # Инициализация конфигурации
 settings = Settings()
 
-# Создание брокера сообщений RabbitMQ
-broker = RabbitBroker(url=settings.get_rabbitmq_url)
+broker = RabbitBroker(
+    url=settings.get_rabbitmq_url, reconnect_interval=5
+    )
 
 # Создание планировщика задач
 scheduler = AsyncIOScheduler(

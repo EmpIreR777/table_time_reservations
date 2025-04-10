@@ -2,6 +2,7 @@ from datetime import date
 from aiogram.types import CallbackQuery
 from aiogram_dialog import DialogManager
 from aiogram_dialog.widgets.kbd import Button
+from loguru import logger
 
 from app.core.config import broker
 from app.tg_bot.booking.schemas import SCapacity, SNewBooking
@@ -63,7 +64,8 @@ async def process_slots_selected(callback: CallbackQuery, widget, dialog_manager
     await dialog_manager.next()
 
 
-async def on_confirmation(callback: CallbackQuery, widget, dialog_manager: DialogManager, **kwargs):
+async def on_confirmation(
+        callback: CallbackQuery, widget, dialog_manager: DialogManager, **kwargs):
     """Обработчик подтверждения бронирования."""
     session = dialog_manager.middleware_data.get("session_with_commit")
 
@@ -93,8 +95,11 @@ async def on_confirmation(callback: CallbackQuery, widget, dialog_manager: Dialo
             f"Внимание! Пользователь с ID {callback.from_user.id} забронировал столик  №{selected_table.id} "
             f"на {booking_date}. Время брони с {selected_slot.start_time} до {selected_slot.end_time}"
         )
-        await broker.publish(admin_text, "admin_msg")
-        await broker.publish(callback.from_user.id, "noti_user")
+        try:
+            await broker.publish(admin_text, "admin_msg")
+            await broker.publish(callback.from_user.id, "noti_user")
+        except Exception as e:
+            logger.error(f"Ошибка при публикации сообщения в RabbitMQ: {e}")
         await dialog_manager.done()
     else:
         await callback.answer("Места на этот слот уже заняты!")

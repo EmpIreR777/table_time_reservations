@@ -1,3 +1,4 @@
+import logging
 from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart
@@ -23,7 +24,8 @@ async def cmd_start(message: Message, session_with_commit: AsyncSession, state: 
     await state.clear()
     user_data = message.from_user
     user_id = user_data.id
-    user_info = await UserDAO(session_with_commit).find_one_or_none_by_id(user_id)
+    user_info = await UserDAO(
+        session_with_commit).find_one_or_none_by_id(user_id)
     if user_info is None:
         user_schema = SUser(
             telegram_id=user_id, first_name=user_data.first_name, last_name=user_data.last_name, username=user_data.username
