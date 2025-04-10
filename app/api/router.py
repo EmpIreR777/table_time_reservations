@@ -1,6 +1,4 @@
-import asyncio
 from datetime import datetime, timedelta
-import time
 from loguru import logger
 
 from app.tg_bot.create_bot import bot
@@ -17,7 +15,6 @@ async def disable_booking():
 @broker.subscriber("admin_msg")
 async def send_booking_msg(msg: str):
     for admin in settings.ADMIN_IDS:
-        time.sleep(12)
         await bot.send_message(admin, text=msg)
 
 
@@ -53,11 +50,11 @@ async def schedule_user_notifications(user_id: int):
     for i, notification in enumerate(notifications):
         job_id = f"user_notification_{user_id}_{i}"
         scheduler.add_job(
-            send_user_msg,
-            "date",
-            run_date=notification["time"],
-            args=[user_id, notification["text"]],
-            id=job_id,
-            replace_existing=True,
+            send_user_msg,  # Функция для вызова
+            "date",  # Тип триггера (однократно в указанное время)
+            run_date=notification["time"],  # Когда выполнить
+            args=[user_id, notification["text"]],  # Аргументы
+            id=job_id,  # Уникальный ID задачи
+            replace_existing=True,  # Перезаписать, если задача существует
         )
         logger.info(f"Запланировано уведомление для пользователя {user_id} на {notification['time']}")

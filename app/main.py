@@ -6,7 +6,7 @@ from aiogram.types import Update
 from fastapi import FastAPI, Request
 
 from app.api.router import disable_booking
-
+from app.api.tests_routers import router as test_schedule_router
 
 logger = setup_logger(
     log_dir='logs',
@@ -59,4 +59,4 @@ async def webhook(request: Request) -> None:
     except Exception as e:
         logger.error(f'Ошибка при обработке обновления с вебхука: {e}')
 
-
+app.include_router(test_schedule_router)
