@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from datetime import datetime
+
+from app.api.utils import sms_service
 from app.core.config import scheduler
+from app.schemas.users_schemas import SMSRequest
 
 router = APIRouter()
 
@@ -24,3 +27,27 @@ async def force_run_job(job_id: str):
         "message_text": text,
         "user_id": user_id,
     }
+
+
+@router.post("/send-sms/")
+async def send_sms(request: SMSRequest):
+    """
+    Отправка SMS через сервис SMS.ru
+    
+    Параметры:
+    - phone: номер телефона в формате 79991112233
+    - message: текст сообщения (до 800 символов)
+    """
+    try:
+        result = await sms_service.send_sms(request.phone, request.message)
+        return {
+            "status": "success",
+            "data": result,
+            "message": "SMS отправлено успешно"
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e))

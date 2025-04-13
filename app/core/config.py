@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     RABBITMQ_PORT: int
     VHOST: str
 
+    SMS_RU_API_ID: str
+    SMS_RU_SENDER: str
+
     model_config = SettingsConfigDict(env_file=env_file_path)
 
     @property

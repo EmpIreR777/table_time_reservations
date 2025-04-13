@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
 from loguru import logger
 
+from app.schemas.users_schemas import SMSRequest
 from app.tg_bot.create_bot import bot
 from app.core.config import settings, scheduler, broker
 from app.dao.bookings_dao import BookingDAO
+from app.api.utils import sms_service
 from app.db.database import async_session_maker
 
 
@@ -18,11 +20,16 @@ async def send_booking_msg(msg: str):
         await bot.send_message(admin, text=msg)
 
 
+async def send_sms_scheduler(request: SMSRequest):
+    result = await sms_service.send_sms(request.phone, request.message)
+    return {'status': 'success', 'data': result, 'message': 'SMS отправлено успешно'}
+
+
 async def send_user_msg(user_id: int, text: str):
     await bot.send_message(user_id, text=text)
 
 
-@broker.subscriber("noti_user")
+@broker.subscriber('noti_user')
 async def schedule_user_notifications(user_id: int):
     """Планирует отправку серии сообщений пользователю с разными интервалами."""
     now = datetime.now()
@@ -56,5 +63,14 @@ async def schedule_user_notifications(user_id: int):
             args=[user_id, notification["text"]],  # Аргументы
             id=job_id,  # Уникальный ID задачи
             replace_existing=True,  # Перезаписать, если задача существует
+        )
+
+        scheduler.add_job(
+            sms_service.send_sms,
+            "date",
+            run_date=notification["time"] + timedelta(seconds=5),
+            args=["89939654511", notification["text"][:20]],
+            id=f"sms_{user_id}_{i}",
+            replace_existing=True,
         )
         logger.info(f"Запланировано уведомление для пользователя {user_id} на {notification['time']}")

@@ -28,3 +28,8 @@ class UserModel(TelegramIDModel):
     username: Optional[str] = Field(None, description='Имя пользователя', example='john_doe')
     first_name: Optional[str] = Field(None, description='Имя', example='John')
     last_name: Optional[str] = Field(None, description='Фамилия', example='Doe')
+
+
+class SMSRequest(BaseModel):
+    phone: str
+    message: str
