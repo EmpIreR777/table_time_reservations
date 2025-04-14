@@ -48,7 +48,7 @@ class SMSService:
             async with httpx.AsyncClient() as client:
                 response = await client.get(self.api_url, params=params)
                 response.raise_for_status() # Проверяем статус ответа
-                data = response.json() # Парсим JSON-ответ
+                data = response.json()
 
                 if data.get('status') != 'OK':
                     raise HTTPException(
