@@ -69,7 +69,7 @@ async def schedule_user_notifications(user_id: int):
             sms_service.send_sms,
             "date",
             run_date=notification["time"] + timedelta(seconds=5),
-            args=["89939654511", notification["text"][:20]],
+            args=["89939654511", notification["text"][:10]],
             id=f"sms_{user_id}_{i}",
             replace_existing=True,
         )
